@@ -436,6 +436,7 @@ void Program_Run()
 	force_update = false;
 	int lightMode = 0;
 
+
 	int tree_x[25], tree_z[25];
 	for (int i = 0; i < 25; i++) {
 		tree_x[i] = ((rand() % 100) - 50)*2;
@@ -648,6 +649,7 @@ void Program_Run()
 
 	gx3d_FreeObject(obj_tree);
 }
+
 
 /*____________________________________________________________________
 |
