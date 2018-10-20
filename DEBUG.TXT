@@ -1,0 +1,13 @@
+_______________ Device Info ______________
+max texture size: 8192x8192
+max active lights: 8
+max user clip planes: 6
+max simultaneous texture stages: 8
+max texture stages: 8
+max texture repeat: 8192
+__________________________________________
+d3d9_InitTexture(): texture format chosen = 8/8/8/8
+d3d9_InitTexture(): texture format chosen = 8/8/8/8
+d3d9_InitTexture(): texture format chosen = 8/8/8/8
+d3d9_InitTexture(): texture format chosen = 8/8/8/8
+gx3d_FreeAllObjects(): Freeing 3 objects left in memory
