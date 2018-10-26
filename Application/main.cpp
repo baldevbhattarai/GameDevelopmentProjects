@@ -269,6 +269,19 @@ void Program_Run()
 	debug_WriteFile(str);
 	debug_WriteFile("__________________________________________");
 
+
+	/*____________________________________________________________________
+|
+| Initialize the sound library
+|___________________________________________________________________*/
+
+	snd_Init(22, 16, 2, 1, 1);
+	snd_SetListenerDistanceFactorToFeet(snd_3D_APPLY_NOW);
+
+	Sound s_footsteps, s_background;
+
+	s_background = snd_LoadSound("wav\\backgroundSound.wav", snd_CONTROL_VOLUME, 0);
+	s_footsteps = snd_LoadSound("wav\\footsteps.wav", snd_CONTROL_3D, 0);
 	/*____________________________________________________________________
 	|
 	| Initialize the graphics state
@@ -436,10 +449,21 @@ void Program_Run()
 	force_update = false;
 	int lightMode = 0;
 
+	 boolean walking = false;
+
+	snd_PlaySound(s_background, 1);
+	snd_SetSoundVolume(s_background, 50);
+
+	/*snd_SetSoundMode(s_footsteps, snd_3D_MODE_ORIGIN_RELATIVE, snd_3D_APPLY_NOW);
+	snd_SetSoundPosition(s_footsteps, 30, 0, 0, snd_3D_APPLY_NOW);
+	snd_SetSoundMinDistance(s_footsteps, 10, snd_3D_APPLY_NOW);
+	snd_SetSoundMaxDistance(s_footsteps, 100, snd_3D_APPLY_NOW);
+	snd_PlaySound(s_footsteps, 1);*/
+
 
 	int tree_x[25], tree_z[25];
 	for (int i = 0; i < 25; i++) {
-		tree_x[i] = ((rand() % 100) - 50)*2;
+		tree_x[i] = ((rand() % 100) - 50) * 2;
 		tree_z[i] = ((rand() % 100) - 50) * 2;
 	}
 	int grass_x[200], grass_z[200];
@@ -508,6 +532,15 @@ void Program_Run()
 					cmd_move &= ~(POSITION_MOVE_RIGHT);
 				else if (event.keycode == evKY_SHIFT)
 					fastMovement = false;
+			}
+			if (cmd_move != 0) {
+				walking = true;
+				if (!snd_IsPlaying(s_footsteps))
+					snd_PlaySound(s_footsteps, 1);
+			}
+			else {
+				walking = false;
+				snd_StopSound(s_footsteps);
 			}
 		}
 		// Check for camera movement (via mouse)
@@ -586,10 +619,10 @@ void Program_Run()
 
 			gx3d_GetScaleMatrix(&m4, 2, 2, 2);
 			//gx3d_MultiplyMatrix(&m, &m4, &m);
-		
 
-	/*		int grassArray_x[] = { 0, 20, 30, 40, -5, -15, -30 };
-			int grassArray_z[] = { -12,0,13 };
+
+			/*int grassArray_x[] = { 0, 20, 30, 40, -5, -15, -30 };
+				int grassArray_z[] = { -12,0,13 };
 			for (int i = 0; i < sizeof(grassArray_x); i++) {
 				for (int j = 0; j < sizeof(grassArray_z); j++) {
 					gx3d_GetTranslateMatrix(&m5, grassArray_x[i], 0, grassArray_z[j]);
@@ -630,9 +663,9 @@ void Program_Run()
 			gx3d_DisableAlphaBlending();
 			gx3d_DisableAlphaTesting();
 
-			
-				gx3d_DisableLight(dir_light);
-				gx3d_DisableLight(point_light1);
+
+			gx3d_DisableLight(dir_light);
+
 
 			// Stop rendering
 			gx3d_EndRender();
@@ -648,6 +681,10 @@ void Program_Run()
 	|___________________________________________________________________*/
 
 	gx3d_FreeObject(obj_tree);
+
+
+	snd_StopSound(s_background);
+	snd_Free();
 }
 
 
