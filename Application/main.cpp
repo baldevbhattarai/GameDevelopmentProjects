@@ -278,10 +278,14 @@ void Program_Run()
 	snd_Init(22, 16, 2, 1, 1);
 	snd_SetListenerDistanceFactorToFeet(snd_3D_APPLY_NOW);
 
-	Sound s_footsteps, s_background;
+	Sound s_footsteps, s_background, s_roarSound;
 
 	s_background = snd_LoadSound("wav\\backgroundSound.wav", snd_CONTROL_VOLUME, 0);
-	s_footsteps = snd_LoadSound("wav\\footsteps.wav", snd_CONTROL_3D, 0);
+	s_footsteps = snd_LoadSound("wav\\footsteps.wav", snd_CONTROL_VOLUME, 0);
+	s_roarSound = snd_LoadSound("wav\\s_TigerRoar.wav", snd_CONTROL_3D, 0);
+
+
+	
 	/*____________________________________________________________________
 	|
 	| Initialize the graphics state
@@ -452,13 +456,15 @@ void Program_Run()
 	 boolean walking = false;
 
 	snd_PlaySound(s_background, 1);
-	snd_SetSoundVolume(s_background, 50);
+	snd_SetSoundVolume(s_background, 60);
 
-	/*snd_SetSoundMode(s_footsteps, snd_3D_MODE_ORIGIN_RELATIVE, snd_3D_APPLY_NOW);
-	snd_SetSoundPosition(s_footsteps, 30, 0, 0, snd_3D_APPLY_NOW);
-	snd_SetSoundMinDistance(s_footsteps, 10, snd_3D_APPLY_NOW);
-	snd_SetSoundMaxDistance(s_footsteps, 100, snd_3D_APPLY_NOW);
-	snd_PlaySound(s_footsteps, 1);*/
+	snd_SetSoundMode(s_roarSound, snd_3D_MODE_ORIGIN_RELATIVE, snd_3D_APPLY_NOW);
+	snd_SetSoundPosition(s_roarSound, 0, 0, 0, snd_3D_APPLY_NOW);
+	snd_SetSoundMinDistance(s_roarSound, 10, snd_3D_APPLY_NOW);
+	snd_SetSoundMaxDistance(s_roarSound, 150, snd_3D_APPLY_NOW);
+	snd_PlaySound(s_roarSound, 1);
+	
+
 
 
 	int tree_x[25], tree_z[25];
@@ -537,10 +543,13 @@ void Program_Run()
 				walking = true;
 				if (!snd_IsPlaying(s_footsteps))
 					snd_PlaySound(s_footsteps, 1);
+					
 			}
 			else {
 				walking = false;
 				snd_StopSound(s_footsteps);
+			
+
 			}
 		}
 		// Check for camera movement (via mouse)
@@ -558,7 +567,8 @@ void Program_Run()
 		bool position_changed, camera_changed;
 		Position_Update(elapsed_time, cmd_move, -move_y, move_x, force_update,
 			&position_changed, &camera_changed, &position, &heading);
-
+		snd_SetListenerPosition(position.x, position.y, position.z, snd_3D_APPLY_NOW);
+		snd_SetListenerOrientation(heading.x, heading.y, heading.z, 0, 1, 0, snd_3D_APPLY_NOW);
 		/*____________________________________________________________________
 		|
 		| Draw 3D graphics
