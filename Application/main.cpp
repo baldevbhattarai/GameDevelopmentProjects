@@ -472,8 +472,8 @@ void Program_Run()
 		tree_x[i] = ((rand() % 100) - 50) * 2;
 		tree_z[i] = ((rand() % 100) - 50) * 2;
 	}
-	int grass_x[200], grass_z[200];
-	for (int i = 0; i < 200; i++) {
+	int grass_x[2000], grass_z[2000];
+	for (int i = 0; i < 2000; i++) {
 		grass_x[i] = ((rand() % 100) - 50) * 2;
 		grass_z[i] = ((rand() % 100) - 50) * 2;
 	}
@@ -642,16 +642,36 @@ void Program_Run()
 					gx3d_DrawObject(obj_flower, 0);
 				}
 			}*/
-			for (int i = 0; i < 200; i++) {
-				//  gx3d_GetScaleMatrix(&m1, 2, 2, 2);
-				gx3d_GetTranslateMatrix(&m, grass_x[i], 0, grass_z[i]);
-				//  gx3d_MultiplyMatrix(&m1, &m, &m);
-				gx3d_SetObjectMatrix(obj_grass, &m);
-				gx3d_SetTexture(0, tex_grass);
-				gx3d_DrawObject(obj_grass, 0);
+			
+			
+			for (int i = 0; i < 2000; i++) {
+				gxRelation relation;
+				gx3dSphere sphere;
+				sphere = obj_grass->bound_sphere;
+				sphere.center.x += grass_x[i];
+				sphere.center.z += grass_z[i];
+				relation = gx3d_Relation_Sphere_Frustum(&sphere);
+				if (relation != gxRELATION_OUTSIDE)
+				{
+					//  gx3d_GetScaleMatrix(&m1, 2, 2, 2);
+					gx3d_GetTranslateMatrix(&m, grass_x[i], 0, grass_z[i]);
+					//  gx3d_MultiplyMatrix(&m1, &m, &m);
+					gx3d_SetObjectMatrix(obj_grass, &m);
+					gx3d_SetTexture(0, tex_grass);
+					gx3d_DrawObject(obj_grass, 0);
+				}
 			}
 			//Drawing 25 trees
 			for (int i = 0; i < 25; i++) {
+				gxRelation relation1;
+				gx3dBox box;
+				box = obj_tree->bound_box;
+				box.min.x += tree_x[i];
+				box.min.z += tree_z[i];
+				box.max.x += tree_x[i];
+				box.max.z += tree_z[i];
+				gx3d_GetIdentityMatrix(&m);
+				relation1 = gx3d_Relation_Box_Frustum(&box, &m);
 				//  gx3d_GetScaleMatrix(&m1, 2, 2, 2);
 				gx3d_GetTranslateMatrix(&m, tree_x[i], 0, tree_z[i]);
 				//  gx3d_MultiplyMatrix(&m1, &m, &m);
