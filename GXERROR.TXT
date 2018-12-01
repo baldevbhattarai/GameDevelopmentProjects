@@ -1,2 +1,2 @@
-Sat Oct 20 12:30:23 2018
- gxGetBMPFileDimensions(): can't open BMP file
+Fri Nov 30 08:32:27 2018
+ Get_LWO2_Texture_Filenames(): Error no textures found!

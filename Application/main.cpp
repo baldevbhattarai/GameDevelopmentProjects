@@ -208,6 +208,23 @@ static void Set_Mouse_Cursor()
 	msSetCursor(msCURSOR_MEDIUM_ARROW, fc, bc);
 }
 
+struct BirdPos {
+	gx3dVector world, view;
+};
+
+int compare_ghosts(const void *elem1, const void *elem2)
+{
+	BirdPos *e1 = (BirdPos *)elem1;
+	BirdPos *e2 = (BirdPos *)elem2;
+
+	if (e1->view.z == e2->view.z)
+		return 0;
+	else if (e1->view.z < e2->view.z)
+		return 1;
+	else
+		return -1; // e2 > e1
+}
+
 /*____________________________________________________________________
 |
 | Function: Program_Run
@@ -225,7 +242,7 @@ void Program_Run()
 	gxColor color;
 	char str[256];
 
-	gx3dObject *obj_grass, *obj_tree, *obj_skydome, *obj_clouddome, *obj_ghost;
+	gx3dObject *obj_grass, *obj_tree, *obj_skydome, *obj_clouddome, *obj_bird, *obj_bird1;
 	gx3dMatrix m, m1, m2, m3, m4, m5;
 	gx3dColor color3d_white = { 1, 1, 1, 0 };
 	gx3dColor color3d_dim = { 0.1f, 0.1f, 0.1f };
@@ -248,6 +265,16 @@ void Program_Run()
 	   //strcpy (ss, mystr.c_str());
 	   //debug_WriteFile (ss);
 
+#define TOTAL_BIRDS 20        // the C style way of making constant
+//const int TOTAL_BIRDS = 20;  // the C++ style way of making a constant
+
+	BirdPos bird_pos[TOTAL_BIRDS];
+
+	for (int i = 0; i < TOTAL_BIRDS; i++) {
+		bird_pos[i].world.x = (random_GetFloat() * 100 - 50) * 2;
+		bird_pos[i].world.y = 1;
+		bird_pos[i].world.z = random_GetFloat() * -100;
+	}
    /*____________________________________________________________________
    |
    | Print info about graphics driver to debug file.
@@ -278,12 +305,14 @@ void Program_Run()
 	snd_Init(22, 16, 2, 1, 1);
 	snd_SetListenerDistanceFactorToFeet(snd_3D_APPLY_NOW);
 
-	Sound s_footsteps, s_background, s_roarSound;
+	Sound s_footsteps, s_background, s_roarSound, s_gunShot, s_squish;
 
 	s_background = snd_LoadSound("wav\\backgroundSound.wav", snd_CONTROL_VOLUME, 0);
 	s_footsteps = snd_LoadSound("wav\\footsteps.wav", snd_CONTROL_VOLUME, 0);
 	s_roarSound = snd_LoadSound("wav\\s_TigerRoar.wav", snd_CONTROL_3D, 0);
 
+	s_gunShot = snd_LoadSound("wav\\s_gunShot.wav", snd_CONTROL_VOLUME, 0);
+	s_squish = snd_LoadSound("wav\\killed.wav", snd_CONTROL_VOLUME, 0);
 
 	
 	/*____________________________________________________________________
@@ -365,7 +394,60 @@ void Program_Run()
 	gx3dTexture tex_grass = gx3d_InitTexture_File("Objects\\grass1.bmp", "Objects\\grass1_fa.bmp", 0);
 
 
+	gx3d_ReadLWO2File("Objects\\billboard_bird.lwo", &obj_bird, gx3d_VERTEXFORMAT_DEFAULT, gx3d_DONT_LOAD_TEXTURES);
+	gx3d_ReadLWO2File("Objects\\billboard_bird1.lwo", &obj_bird1, gx3d_VERTEXFORMAT_DEFAULT, gx3d_DONT_LOAD_TEXTURES);
 
+
+	gx3dTexture tex_bird = gx3d_InitTexture_File("Objects\\Images\\birda.bmp", "Objects\\Images\\birdaa_fa.bmp", 0);
+	gx3dTexture tex_coloredBird = gx3d_InitTexture_File("Objects\\Images\\bird.bmp", "Objects\\Images\\birdaa_fa.bmp", 0);
+	
+	gx3dTexture tex_temp;
+	gx3dTexture tex_one = gx3d_InitTexture_File("Objects\\Images\\1.bmp", "Objects\\Images\\1_fa.bmp", 0);
+	gx3dTexture tex_two = gx3d_InitTexture_File("Objects\\Images\\2.bmp", "Objects\\Images\\2_fa.bmp", 0);
+	gx3dTexture tex_three = gx3d_InitTexture_File("Objects\\Images\\3.bmp", "Objects\\Images\\3_fa.bmp", 0);
+	gx3dTexture tex_four = gx3d_InitTexture_File("Objects\\Images\\4.bmp", "Objects\\Images\\4_fa.bmp", 0);
+	gx3dTexture tex_five = gx3d_InitTexture_File("Objects\\Images\\5.bmp", "Objects\\Images\\5_fa.bmp", 0);
+	gx3dTexture tex_six = gx3d_InitTexture_File("Objects\\Images\\6.bmp", "Objects\\Images\\6_fa.bmp", 0);
+	gx3dTexture tex_seven = gx3d_InitTexture_File("Objects\\Images\\7.bmp", "Objects\\Images\\7_fa.bmp", 0);
+	gx3dTexture tex_eight = gx3d_InitTexture_File("Objects\\Images\\8.bmp", "Objects\\Images\\8_fa.bmp", 0);
+	gx3dTexture tex_nine = gx3d_InitTexture_File("Objects\\Images\\9.bmp", "Objects\\Images\\9_fa.bmp", 0);
+	gx3dTexture tex_ten = gx3d_InitTexture_File("Objects\\Images\\10.bmp", "Objects\\Images\\10_fa.bmp", 0);
+
+	gx3dTexture tex_oouch = gx3d_InitTexture_File("Objects\\Images\\oouch.bmp", "Objects\\Images\\oouch_fa.bmp", 0);
+
+
+
+
+	gx3dVector birdPosition[TOTAL_BIRDS];
+	float birdSpeed[TOTAL_BIRDS];
+	boolean birdDraw[TOTAL_BIRDS];
+	boolean birdOnScreen[TOTAL_BIRDS];
+	gx3dSphere birdSphere[TOTAL_BIRDS];
+
+	float xspeed[TOTAL_BIRDS];
+	float yspeed[TOTAL_BIRDS];
+	float zspeed[TOTAL_BIRDS];
+	int num_Birds_clicked = 0;
+
+	int ghostHit[TOTAL_BIRDS];
+
+	for (int i = 0; i < TOTAL_BIRDS; i++) {
+		birdPosition[i].x = (int)(rand() % 150-70);
+		birdPosition[i].y = rand()%5;
+		birdPosition[i].z = (int)(rand() % 200 -100);
+		birdSpeed[i] = 0.1f*(i+1);
+		xspeed[i] = birdSpeed[i];
+		yspeed[i]= birdSpeed[i]*0.1f;
+		zspeed[i] = birdSpeed[i]* 1.8f;
+		birdDraw[i] = true;
+
+		ghostHit[i] = 0;
+	}
+
+	const int MAX_OUCH = 20;
+	gx3dVector ouchPosition[MAX_OUCH];
+	int ouchTimer[MAX_OUCH];
+	int ouchIndex = 0;
 	/*____________________________________________________________________
 	|
 	| create lights
@@ -442,6 +524,8 @@ void Program_Run()
 	| Main game loop
 	|___________________________________________________________________*/
 
+
+
 	// Variables
 	unsigned elapsed_time, last_time, new_time;
 	bool force_update;
@@ -472,8 +556,8 @@ void Program_Run()
 		tree_x[i] = ((rand() % 100) - 50) * 2;
 		tree_z[i] = ((rand() % 100) - 50) * 2;
 	}
-	int grass_x[2000], grass_z[2000];
-	for (int i = 0; i < 2000; i++) {
+	int grass_x[200], grass_z[200];
+	for (int i = 0; i < 200; i++) {
 		grass_x[i] = ((rand() % 100) - 50) * 2;
 		grass_z[i] = ((rand() % 100) - 50) * 2;
 	}
@@ -539,6 +623,40 @@ void Program_Run()
 				else if (event.keycode == evKY_SHIFT)
 					fastMovement = false;
 			}
+			
+			else if (event.type == evTYPE_MOUSE_LEFT_PRESS) {
+				boolean sound_played = false;
+				gx3dRay viewVector;
+				viewVector.origin = position;
+				viewVector.direction = heading;
+				for (int i = 0; i < TOTAL_BIRDS; i++) {
+					snd_PlaySound(s_gunShot, 0);
+
+					if (birdOnScreen[i]) {
+						gxRelation rel = gx3d_Relation_Ray_Sphere(&viewVector, &birdSphere[i]);
+						if (rel != gxRELATION_OUTSIDE) {
+							ghostHit[i] += 1;
+							if (ghostHit[i] == 3) {
+								snd_PlaySound(s_squish, 0);
+
+								birdDraw[i] = false;
+
+
+								if (num_Birds_clicked <= 9)
+								{
+									num_Birds_clicked++;
+
+								}
+								ouchPosition[ouchIndex] = birdSphere[i].center;
+								ouchTimer[ouchIndex] = 1000 + elapsed_time;
+								ouchIndex = (ouchIndex + 1) % MAX_OUCH;
+							}
+						}
+					}
+				}
+			}
+
+
 			if (cmd_move != 0) {
 				walking = true;
 				if (!snd_IsPlaying(s_footsteps))
@@ -581,27 +699,7 @@ void Program_Run()
 			// Set the default material
 			gx3d_SetMaterial(&material_default);
 
-			//switch (lightMode) {
-			//case 0: //Ambient
-			//	gx3d_SetAmbientLight(color3d_white);
-			//	gx3d_DisableLight(dir_light);
-			//	gx3d_DisableLight(point_light1);
-			//	break;
-
-			//case 1: //Directional
-			//	gx3d_SetAmbientLight(color3d_dim);
-			//	gx3d_DisableLight(point_light1);
-			//	gx3d_EnableLight(dir_light);
-			//	break;
-
-			//case 2: //Point
-			//	gx3d_SetAmbientLight(color3d_dim);
-			//	gx3d_DisableLight(dir_light);
-			//	gx3d_EnableLight(point_light1);
-			//	break;
-			//}
-
-
+		
 			gx3d_SetAmbientLight(color3d_white);
 
 			// Draw skydome
@@ -630,21 +728,8 @@ void Program_Run()
 			gx3d_GetScaleMatrix(&m4, 2, 2, 2);
 			//gx3d_MultiplyMatrix(&m, &m4, &m);
 
-
-			/*int grassArray_x[] = { 0, 20, 30, 40, -5, -15, -30 };
-				int grassArray_z[] = { -12,0,13 };
-			for (int i = 0; i < sizeof(grassArray_x); i++) {
-				for (int j = 0; j < sizeof(grassArray_z); j++) {
-					gx3d_GetTranslateMatrix(&m5, grassArray_x[i], 0, grassArray_z[j]);
-					gx3d_MultiplyMatrix(&m5, &m4, &m);
-					gx3d_SetObjectMatrix(obj_flower, &m);
-					gx3d_SetTexture(0, tex_grass);
-					gx3d_DrawObject(obj_flower, 0);
-				}
-			}*/
 			
-			
-			for (int i = 0; i < 2000; i++) {
+			for (int i = 0; i < 200; i++) {
 				gxRelation relation;
 				gx3dSphere sphere;
 				sphere = obj_grass->bound_sphere;
@@ -661,34 +746,215 @@ void Program_Run()
 					gx3d_DrawObject(obj_grass, 0);
 				}
 			}
-			//Drawing 25 trees
-			for (int i = 0; i < 25; i++) {
-				gxRelation relation1;
-				gx3dBox box;
-				box = obj_tree->bound_box;
-				box.min.x += tree_x[i];
-				box.min.z += tree_z[i];
-				box.max.x += tree_x[i];
-				box.max.z += tree_z[i];
-				gx3d_GetIdentityMatrix(&m);
-				relation1 = gx3d_Relation_Box_Frustum(&box, &m);
-				//  gx3d_GetScaleMatrix(&m1, 2, 2, 2);
-				gx3d_GetTranslateMatrix(&m, tree_x[i], 0, tree_z[i]);
-				//  gx3d_MultiplyMatrix(&m1, &m, &m);
-				gx3d_SetObjectMatrix(obj_tree, &m);
-				gx3d_SetTexture(0, tex_tree2);
-				gx3d_DrawObject(obj_tree, 0);
-			}
-			// Draw a Pyramid
-			/*gx3d_GetRotateYMatrix(&m1, 45);
-			gx3d_GetTranslateMatrix(&m2, 100, 0, 250);
-			gx3d_MultiplyMatrix(&m1, &m2, &m);
-			gx3d_GetScaleMatrix(&m3, 0.5, 0.5, 0.5);
-			gx3d_MultiplyMatrix(&m, &m3, &m);
-			gx3d_SetObjectMatrix(obj_pyramid, &m);
-			gx3d_SetTexture(0, tex_pyramid);
-			gx3d_DrawObject(obj_pyramid, 0);*/
+			gx3d_DisableLight(dir_light);
+			gx3d_SetAmbientLight(color3d_white);
 
+		
+
+			for (int i = 0; i < TOTAL_BIRDS; i++) {
+
+			//--------------animate here------
+				birdPosition[i].x += xspeed[i];
+				birdPosition[i].y += yspeed[i];
+				birdPosition[i].z += zspeed[i];
+
+
+			
+				if (birdPosition[i].x > 90 ) {
+					xspeed[i] *= -1;
+					
+
+				}
+				else if (birdPosition[i].x < -85) {
+					xspeed[i] *= -1;
+				}
+				if (birdPosition[i].y > 30) {
+					
+					yspeed[i] *= -1;
+					
+				}
+				else if (birdPosition[i].y <2) {
+					
+					yspeed[i] *= -1;
+					
+				}
+				if (birdPosition[i].z > 150) {
+					
+					zspeed[i] *= -1;
+				}
+				else if (birdPosition[i].z > -150) {
+					
+					zspeed[i] *= -1;
+				}
+				//end animation-----------
+			}
+
+			//update bounding sphere
+			for (int i = 0; i < TOTAL_BIRDS; i++) {
+				if (birdDraw[i]) {
+					birdSphere[i] = obj_bird->bound_sphere;
+					birdSphere[i].center.x *= 12;
+					birdSphere[i].center.y *= 12;
+					birdSphere[i].center.z *= 12;
+					birdSphere[i].center.x = birdPosition[i].x;
+					birdSphere[i].center.y = birdPosition[i].y;
+					birdSphere[i].center.z = birdPosition[i].z;
+					birdSphere[i].radius *= 12;
+				}
+			}
+
+
+			//Draw Ghost
+			static gx3dVector billboard_normal = { 0,0,1 };
+			//caston
+			for (int i = 0; i < TOTAL_BIRDS; i++) {
+				if (birdDraw[i]) { //check if ghost is dead
+
+
+					gxRelation relation;
+					//gx3dSphere sphere;
+					//sphere = obj_bird->bound_sphere;
+					//sphere.center.x += birdPosition[i].x;//bird_pos[i].world.x;
+					//sphere.center.z += birdPosition[i].z; ;// bird_pos[i].world.z;
+					relation = gx3d_Relation_Sphere_Frustum(&birdSphere[i]);
+					gx3d_GetIdentityMatrix(&m);
+					relation = gx3d_Relation_Sphere_Frustum(&birdSphere[i]);
+					birdOnScreen[i] = false;
+					if (relation != gxRELATION_OUTSIDE) {
+						gx3d_GetScaleMatrix(&m1, 12, 12, 12);
+						gx3d_GetBillboardRotateYMatrix(&m2, &billboard_normal, &heading);
+
+						gx3d_GetTranslateMatrix(&m3, birdPosition[i].x, birdPosition[i].y, birdPosition[i].z);
+						//gx3d_GetTranslateMatrix(&m3, targetX, 0, bird_pos[i].world.z);
+						gx3d_MultiplyMatrix(&m1, &m2, &m);
+						gx3d_MultiplyMatrix(&m, &m3, &m);
+						gx3d_SetObjectMatrix(obj_bird, &m);
+						gx3d_SetTexture(0, tex_bird);
+						gx3d_DrawObject(obj_bird, 0);
+						birdOnScreen[i] = true;
+					}
+					
+				}
+			}
+
+			//*****************ouch*****************
+
+			const float OUCH_SCALE = 7;
+			//update ouch makers timers
+			for (int i = 0; i < MAX_OUCH; i++)
+				if (ouchTimer[i] > 0)
+					ouchTimer[i] -= elapsed_time;
+			//Draw any ouch makers
+			gx3d_EnableAlphaBlending();
+			gx3d_EnableAlphaTesting(128);
+			for (int i = 0; i < MAX_OUCH; i++) {
+				if (ouchTimer[i] > 0) {
+					gx3d_GetScaleMatrix(&m1, OUCH_SCALE, OUCH_SCALE, OUCH_SCALE);
+					gx3d_GetBillboardRotateYMatrix(&m2, &billboard_normal, &heading);
+					//gx3d_GetRotateYMatrix(&m4, 0);
+					float y = ouchPosition[i].y + (1 - (ouchTimer[i] / 1000.0f)) * (2 * OUCH_SCALE);
+					gx3d_GetTranslateMatrix(&m3, ouchPosition[i].x, y + 6, ouchPosition[i].z);
+					gx3d_MultiplyMatrix(&m1, &m4, &m);
+					gx3d_MultiplyMatrix(&m, &m3, &m);
+					//gx3d_MultiplyMatrix(&m, &m4, &m);
+					gx3d_SetObjectMatrix(obj_bird1, &m);
+					gx3d_SetTexture(0, tex_oouch);
+					gx3d_DrawObject(obj_bird1, 0);
+				}
+			}
+			gx3d_DisableAlphaBlending();
+			gx3d_DisableAlphaTesting();
+		
+			/********************************************************************** 2d *****/
+
+			// Save current view matrix
+			gx3dMatrix view_save;
+			gx3d_GetViewMatrix(&view_save);
+
+			// Set new view matrix
+			gx3dVector tfrom = { 0, 0, -1 }, tto = { 0,0,0 }, twup = { 0,1,0 };
+			gx3d_CameraSetPosition(&tfrom, &tto, &twup, gx3d_CAMERA_ORIENTATION_LOOKTO_FIXED);
+			gx3d_CameraSetViewMatrix();
+
+			// Draw 2D icons at top of screen
+			if (num_Birds_clicked) {
+				gx3d_DisableZBuffer();
+				gx3d_EnableAlphaBlending();
+
+
+				switch (num_Birds_clicked)
+				{
+					case 1:
+						tex_temp = tex_one;
+						break;
+					case 2:
+						tex_temp = tex_two;
+						break;
+					case 3:
+						tex_temp = tex_three;
+						break;
+					case 4:
+						tex_temp = tex_four;
+						break;
+
+					case 5:
+						tex_temp = tex_five;
+						break;
+
+					case 6:
+						tex_temp = tex_six;
+						break;
+
+					case 7:
+						tex_temp = tex_seven;
+						break;
+
+					case 8:
+						tex_temp = tex_eight;
+						break;
+
+					case 9:
+						tex_temp = tex_nine;
+						break;
+
+					default:
+						tex_temp = tex_ten;
+						break;
+
+
+				}
+
+				gx3d_GetScaleMatrix(&m1, 0.04f, 0.04f, 0.04f);
+				gx3d_GetRotateYMatrix(&m2, 0);
+
+				gx3d_GetTranslateMatrix(&m3, -0.5, 0.22, 0);
+				gx3d_MultiplyMatrix(&m1, &m2, &m);
+				gx3d_MultiplyMatrix(&m, &m3, &m);
+				gx3d_SetObjectMatrix(obj_bird1, &m);
+				gx3d_SetTexture(0, tex_temp);
+				gx3d_DrawObject(obj_bird1, 0);
+				
+			
+				for (int i = 0; i < num_Birds_clicked; i++) {
+					
+					gx3d_GetScaleMatrix(&m1, 0.04f, 0.05f, 0.05f);
+					gx3d_GetRotateYMatrix(&m2, 180);
+					gx3d_GetTranslateMatrix(&m3, -0.4 + (0.06*i), 0.22, 0);
+					gx3d_MultiplyMatrix(&m1, &m2, &m);
+					gx3d_MultiplyMatrix(&m, &m3, &m);
+					gx3d_SetObjectMatrix(obj_bird, &m);
+					gx3d_SetTexture(0, tex_coloredBird);
+					gx3d_DrawObject(obj_bird, 0);
+					
+				}
+				gx3d_DisableAlphaBlending();
+				gx3d_EnableZBuffer();
+			}
+			// Restore view matrix
+			gx3d_SetViewMatrix(&view_save);
+
+
+			/******************************************************************************/
 			// Disable alpha blending
 			gx3d_DisableAlphaBlending();
 			gx3d_DisableAlphaTesting();
